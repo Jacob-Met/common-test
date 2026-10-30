@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Common Test — turn objections into checks</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#14202b;--mute:#566574;--line:#d3dae1;--accent:#0a5cff;--ok:#0b7a4b;--bad:#c2310f;--badbg:#fde9e3;--okbg:#e2f4ea;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:10px 16px;background:var(--ink);color:#fff}
+header h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px}
+header .sub{color:#b7c3cf;font-size:13px;flex:1;min-width:200px}
+.pill{font:12px var(--mono);padding:3px 8px;border:1px solid #4b6074;border-radius:3px;color:#d7e2ec}
+.pill.live{border-color:#52d08d;color:#8ff0bb}
+.hbtn{background:none;border:1px solid #4b6074;color:#d7e2ec;padding:4px 10px;border-radius:3px}
+.hbtn:hover{background:#243546}
+main{display:grid;grid-template-columns:340px minmax(0,1fr);gap:0;min-height:calc(100vh - 48px)}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px}
+.compose label{display:block;font-weight:600;margin-bottom:4px}
+.compose textarea{width:100%;min-height:74px;padding:8px;border:1.5px solid #8a99a8;border-radius:3px;resize:vertical;background:#fff}
+.compose .row{display:flex;gap:8px;margin-top:6px}
+.compose input{flex:1;min-width:0;padding:6px 8px;border:1.5px solid #8a99a8;border-radius:3px}
+.primary{background:var(--accent);color:#fff;border:0;padding:7px 14px;border-radius:3px;font-weight:600}
+.primary:disabled{opacity:.55;cursor:wait}
+.ghost{background:#fff;border:1px solid #8a99a8;padding:6px 12px;border-radius:3px;font-weight:600}
+.ghost:hover{background:#f0f4f8}
+.msg{font-size:13px;min-height:18px;color:var(--mute)}
+.msg.err{color:var(--bad)}
+#objs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;overflow:auto}
+#objs li{border-left:5px solid var(--line);padding:8px 8px 8px 10px;cursor:pointer;background:#fff}
+#objs li:hover{background:#f3f6f9}
+#objs li.sel{background:#eaf1ff;border-left-color:var(--accent)}
+#objs li.ok{border-left-color:var(--ok)} #objs li.bad{border-left-color:var(--bad)} #objs li.sel.ok,#objs li.sel.bad{box-shadow:inset 0 0 0 2px var(--accent)}
+#objs .who{font-size:12px;color:var(--mute);display:flex;justify-content:space-between;gap:6px}
+#objs .txt{margin:2px 0}
+#objs .st{font:12px var(--mono)}
+#objs .st.ok{color:var(--ok)} #objs .st.bad{color:var(--bad)} #objs .st.none{color:var(--mute)}
+section.work{padding:14px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.revbar{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch}
+.rev{border:1.5px solid #8a99a8;background:#fff;padding:6px 12px;text-align:left;border-radius:3px;min-width:150px}
+.rev b{display:block;font-size:13px}.rev span{font:12px var(--mono);color:var(--mute)}
+.rev[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 -4px 0 var(--accent)}
+.rev .best{display:inline-block;background:var(--ok);color:#fff;font:700 11px var(--sans);padding:1px 6px;border-radius:2px;margin-left:6px}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.tt{background:var(--panel);border:1px solid var(--line);overflow-x:auto}
+.grid{display:grid;grid-template-columns:44px repeat(7,minmax(104px,1fr));min-width:820px}
+.grid .dh{padding:5px 6px;font-weight:700;border-bottom:1px solid var(--line);background:#f6f8fa}
+.grid .dh.we{background:#edf0f4}
+.hours{position:relative;height:calc(17*34px)}
+.hours i{position:absolute;right:5px;font:11px var(--mono);color:var(--mute);transform:translateY(-7px)}
+.col{position:relative;height:calc(17*34px);border-left:1px solid var(--line);background:repeating-linear-gradient(#fff 0 33px,#e6ebf0 33px 34px)}
+.col.we{background-color:#f6f8fa}
+.slot{position:absolute;left:2px;right:2px;padding:2px 5px;border:1px solid #4d6a8a;background:#dfe9f6;border-radius:2px;overflow:hidden;font-size:12px;line-height:1.25;text-align:left;cursor:pointer}
+.slot b{display:block;font-size:12px}.slot em{font:11px var(--mono);font-style:normal;color:#2f4155}
+.slot.v{border-color:var(--bad);background:repeating-linear-gradient(135deg,var(--badbg) 0 6px,#fff 6px 12px);border-width:2px}
+.slot.hit{outline:3px solid var(--bad);outline-offset:1px;z-index:3;background:var(--badbg)}
+.slot.dim{opacity:.45}
+.slot .noise{position:absolute;right:3px;top:2px;font:700 10px var(--mono);color:#2f4155}
+.detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px}
+.detail h2,.matrix h2{margin:0 0 6px;font-size:14px}
+.say{font-size:15px;margin:0 0 8px}
+.rule{background:#101c27;color:#d9ecff;font:12px/1.5 var(--mono);padding:10px;white-space:pre-wrap;word-break:break-word;border-radius:3px;max-height:220px;overflow:auto}
+.read{margin:8px 0;padding:8px 10px;border-left:4px solid var(--accent);background:#eaf1ff}
+.src{font:12px var(--mono);color:var(--mute)}
+.ce{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ce li{border:1px solid var(--bad);background:var(--badbg);padding:7px 9px;cursor:pointer;border-radius:2px}
+.ce li:hover{background:#fbd9ce}
+.holds{padding:8px 10px;background:var(--okbg);border-left:4px solid var(--ok);font-weight:600}
+.matrix{background:var(--panel);border:1px solid var(--line);padding:12px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:center}
+th:first-child,td:first-child{text-align:left}
+td.ok{color:var(--ok);font-weight:700}td.bad{color:var(--bad);font-weight:700}
+th.bestc{background:var(--okbg)}
+.note{color:var(--mute);margin:4px 0 0;font-size:13px}
+@media(max-width:900px){main{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}.detail{grid-template-columns:1fr}.actions{margin-left:0}}
+@media(prefers-reduced-motion:no-preference){.slot,.rev{transition:background .15s,outline-color .15s}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Common Test</h1>
+  <div class="sub" id="ptitle">Loading…</div>
+  <span class="pill" id="nem">Nemotron</span>
+  <button class="hbtn" id="reset" title="Restore the seed proposal and objections">Reset demo data</button>
+</header>
+<main>
+<aside aria-label="Objections">
+  <form class="compose" id="form">
+    <label for="otext">Object in your own words</label>
+    <textarea id="otext" maxlength="400" placeholder="e.g. Nothing with amplified sound after 10pm on Sunday nights, my baby sleeps across the street."></textarea>
+    <div class="row"><input id="oauthor" aria-label="Your name" placeholder="Your name" maxlength="40"><button class="primary" id="osend" type="submit">Compile</button></div>
+    <div class="msg" id="omsg" role="status"></div>
+  </form>
+  <ul id="objs" aria-label="Conditions from objections"></ul>
+</aside>
+<section class="work">
+  <div class="revbar" id="revbar" role="group" aria-label="Revisions"></div>
+  <div class="tt"><div class="grid" id="grid"></div></div>
+  <div class="detail">
+    <div id="odetail"></div>
+    <div id="ces"></div>
+  </div>
+  <div class="matrix"><h2>Which revision satisfies the most?</h2><div id="matrix"></div><div class="note" id="rmsg" role="status"></div></div>
+</section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const H0 = 7, PX = 34;
+let S = null, rev = null, sel = null, hit = new Set();
+const el = (tag, attrs = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); } for (const k of kids.flat()) e.append(k instanceof Node ? k : document.createTextNode(k ?? "")); return e; };
+const mins = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+async function api(path, method = "GET", body) {
+  const r = await fetch(path, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function setState(s) {
+  S = s;
+  if (!rev || !S.revisions.find((r) => r.id === rev)) rev = S.revisions[0].id;
+  if (!sel || !S.objections.find((o) => o.id === sel)) sel = (S.objections.find((o) => o.rule && !S.evals[rev].results[o.id]?.ok) || S.objections[0] || {}).id;
+  hit = new Set();
+  render();
+}
+function render() {
+  $("#ptitle").textContent = S.proposal.title + " — " + S.proposal.blurb;
+  const n = $("#nem"); n.textContent = S.nemotron.live ? "Nemotron live · " + S.nemotron.model.split("/").pop() : "Nemotron: no API key set";
+  n.className = "pill" + (S.nemotron.live ? " live" : "");
+  renderRevs(); renderObjs(); renderGrid(); renderDetail(); renderMatrix();
+}
+function renderRevs() {
+  const bar = $("#revbar"); bar.replaceChildren();
+  for (const r of S.revisions) {
+    const e = S.evals[r.id];
+    bar.append(el("button", { class: "rev", "aria-pressed": String(r.id === rev), "data-rev": r.id, onclick: () => { rev = r.id; hit = new Set(); render(); } },
+      el("b", {}, r.name, r.id === S.bestId ? el("span", { class: "best" }, "Most satisfied") : ""),
+      el("span", {}, `${e.total - e.broken === undefined ? "" : ""}${e.score}/${e.total} weight · ${e.broken} broken`)));
+  }
+  bar.append(el("div", { class: "actions" },
+    el("button", { class: "ghost", id: "brepair", onclick: () => revise("engine") }, "Engine repair"),
+    el("button", { class: "primary", id: "bnem", onclick: () => revise("nemotron") }, "Ask Nemotron to revise")));
+}
+function renderObjs() {
+  const ul = $("#objs"); ul.replaceChildren();
+  const ev = S.evals[rev];
+  for (const o of S.objections) {
+    const r = ev.results[o.id];
+    const cls = !o.rule ? "" : r.ok ? "ok" : "bad";
+    const st = !o.rule ? el("span", { class: "st none" }, o.error ? "not compiled" : "waiting") : r.ok ? el("span", { class: "st ok" }, "✓ holds") : el("span", { class: "st bad" }, `✗ ${r.violations.length} counterexample${r.violations.length > 1 ? "s" : ""}`);
+    ul.append(el("li", { class: `${cls} ${o.id === sel ? "sel" : ""}`, tabindex: "0", "data-obj": o.id, onclick: () => { sel = o.id; hit = new Set(); render(); }, onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sel = o.id; hit = new Set(); render(); } } },
+      el("div", { class: "who" }, el("span", {}, `${o.author} · ${o.supporters.length} support · weight ${o.weight}`), st),
+      el("div", { class: "txt" }, "“" + o.text + "”")));
+  }
+}
+function renderGrid() {
+  const g = $("#grid"); g.replaceChildren();
+  const ev = S.evals[rev];
+  const o = S.objections.find((x) => x.id === sel);
+  const selIds = new Set(); const anyIds = new Set();
+  for (const ob of S.objections) { const r = ev.results[ob.id]; if (!r) continue; for (const v of r.violations) for (const id of v.slotIds) { anyIds.add(id); if (ob.id === sel) selIds.add(id); } }
+  const hours = el("div", { class: "hours" });
+  for (let h = H0; h <= 23; h += 2) hours.append(el("i", { style: `top:${(h - H0) * PX}px` }, String(h).padStart(2, "0") + ":00"));
+  g.append(el("div", { class: "dh" }, ""));
+  DAYS.forEach((d, i) => g.append(el("div", { class: "dh" + (i > 4 ? " we" : "") }, d)));
+  g.append(hours);
+  DAYS.forEach((d, i) => {
+    const col = el("div", { class: "col" + (i > 4 ? " we" : ""), "data-day": d });
+    for (const s of ev.slots.filter((x) => x.day === d)) {
+      const top = (mins(s.start) - H0 * 60) / 60 * PX, h = Math.max(22, (mins(s.end) - mins(s.start)) / 60 * PX - 2);
+      const cls = "slot" + (anyIds.has(s.id) ? " v" : "") + (hit.has(s.id) ? " hit" : "") + (hit.size && !hit.has(s.id) ? " dim" : "");
+      col.append(el("div", { class: cls, "data-slot": s.id, style: `top:${top}px;height:${h}px`, title: `${s.activity} · ${s.group} · $${s.cost}` },
+        el("b", {}, s.activity), el("em", {}, `${s.start}–${s.end}`), el("span", { class: "noise", "aria-label": "noise " + s.noise }, "♪".repeat(s.noise) || "·")));
+    }
+    g.append(col);
+  });
+}
+function renderDetail() {
+  const d = $("#odetail"), c = $("#ces"); d.replaceChildren(); c.replaceChildren();
+  const o = S.objections.find((x) => x.id === sel);
+  if (!o) { d.append(el("p", { class: "note" }, "Type an objection on the left.")); return; }
+  d.append(el("h2", {}, "Objection → executable condition"));
+  d.append(el("p", { class: "say" }, `${o.author}: “${o.text}”`));
+  if (!o.rule) {
+    d.append(el("div", { class: "msg err" }, o.error || "Not compiled yet."));
+    d.append(el("button", { class: "primary", onclick: () => recompile(o.id) }, "Compile with Nemotron"));
+    return;
+  }
+  d.append(el("div", { class: "read" }, "Reads as: ", o.reading));
+  d.append(el("div", { class: "src" }, o.source === "nemotron" ? `Compiled by ${o.model || "Nemotron"}${o.attempts > 1 ? " (after one validator retry)" : ""}; checked by the engine's validator` : o.source === "seed" ? "Seed rule (hand-written). Recompile to have Nemotron write it." : "Edited rule"));
+  d.append(el("pre", { class: "rule", id: "rulejson" }, JSON.stringify(o.rule, null, 1)));
+  d.append(el("div", { style: "margin-top:8px;display:flex;gap:8px" },
+    el("button", { class: "ghost", id: "brecompile", onclick: () => recompile(o.id) }, "Recompile with Nemotron"),
+    el("button", { class: "ghost", onclick: () => api(`/api/objections/${o.id}/support`, "POST", { name: $("#oauthor").value.trim() || "Visitor" }).then((r) => setState(r.state)) }, "Add / remove my support"),
+    el("button", { class: "ghost", onclick: () => api(`/api/objections/${o.id}`, "DELETE").then((r) => setState(r.state)) }, "Delete")));
+  const r = S.evals[rev].results[o.id];
+  c.append(el("h2", {}, `Counterexamples in “${S.revisions.find((x) => x.id === rev).name}”`));
+  if (r.ok) c.append(el("div", { class: "holds" }, "No counterexample: this revision satisfies the condition."));
+  else {
+    const ul = el("ul", { class: "ce", id: "ceslist" });
+    for (const v of r.violations) ul.append(el("li", { tabindex: "0", onclick: () => { hit = new Set(v.slotIds); renderGrid(); }, onkeydown: (e) => { if (e.key === "Enter") { hit = new Set(v.slotIds); renderGrid(); } } }, v.text));
+    c.append(ul, el("p", { class: "note" }, "Click one to highlight the slots on the timetable."));
+  }
+}
+function renderMatrix() {
+  const m = $("#matrix"); m.replaceChildren();
+  const t = el("table", { id: "matrixtable" });
+  t.append(el("thead", {}, el("tr", {}, el("th", {}, "Condition (weight)"), S.revisions.map((r) => el("th", { class: r.id === S.bestId ? "bestc" : "" }, r.name, el("br"), `${S.evals[r.id].score}/${S.evals[r.id].total}`)))));
+  const tb = el("tbody");
+  for (const o of S.objections.filter((x) => x.rule)) tb.append(el("tr", {}, el("td", {}, `${o.author}: ${o.reading} (${o.weight})`), S.revisions.map((r) => { const ok = S.evals[r.id].results[o.id]?.ok; return el("td", { class: ok ? "ok" : "bad", "aria-label": ok ? "satisfied" : "violated" }, ok ? "✓" : "✗ " + S.evals[r.id].results[o.id].violations.length); })));
+  t.append(tb); m.append(t);
+}
+async function recompile(id) {
+  $("#rmsg").className = "note"; $("#rmsg").textContent = "Asking Nemotron to compile…";
+  try { const r = await api(`/api/objections/${id}/compile`, "POST", {}); setState(r.state); $("#rmsg").textContent = r.error ? "Compile failed: " + r.error : "Recompiled by Nemotron."; } catch (e) { $("#rmsg").textContent = e.message; }
+}
+async function revise(mode) {
+  const b = mode === "nemotron" ? $("#bnem") : $("#brepair");
+  b.disabled = true; $("#rmsg").textContent = mode === "nemotron" ? "Nemotron is drafting a revision…" : "Searching single edits…";
+  try {
+    const r = await api("/api/revise", "POST", { mode, base: rev });
+    rev = r.id; setState(r.state);
+    const nr = S.revisions.find((x) => x.id === r.id);
+    $("#rmsg").textContent = `${nr.name}: ${nr.note} Changes: ${nr.opsText.filter((_, i) => i >= 0).slice(-8).join("; ") || "none"}. The engine re-scored it: ${S.evals[nr.id].score}/${S.evals[nr.id].total}.`;
+  } catch (e) { $("#rmsg").textContent = e.message; b.disabled = false; }
+}
+$("#form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("#otext").value.trim(), msg = $("#omsg"), btn = $("#osend");
+  btn.disabled = true; msg.className = "msg"; msg.textContent = "Nemotron is compiling your objection…";
+  try {
+    const r = await api("/api/objections", "POST", { text, author: $("#oauthor").value.trim() });
+    $("#otext").value = ""; sel = r.id; setState(r.state);
+    msg.className = "msg" + (r.error ? " err" : ""); msg.textContent = r.error ? "Saved, but not compiled: " + r.error : "Compiled. Condition added below.";
+  } catch (er) { msg.className = "msg err"; msg.textContent = er.message; }
+  btn.disabled = false;
+});
+$("#reset").addEventListener("click", async () => { if (confirm("Restore seed data?")) { rev = null; sel = null; setState((await api("/api/reset", "POST", {})).state); } });
+api("/api/state").then(setState);
+</script>
+</body>
+</html>
